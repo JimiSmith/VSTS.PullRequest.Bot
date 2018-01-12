@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27130.2010
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VSTS.PullRequest.ReminderBot", "VSTS.PullRequest.ReminderBot\VSTS.PullRequest.ReminderBot.csproj", "{D1611042-45BF-4B4F-8E53-714700C7C044}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VSTS.PullRequest.Bot", "VSTS.PullRequest.Bot\VSTS.PullRequest.Bot.csproj", "{D1611042-45BF-4B4F-8E53-714700C7C044}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
