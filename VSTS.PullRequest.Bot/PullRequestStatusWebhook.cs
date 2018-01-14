@@ -81,6 +81,7 @@ namespace VSTS.PullRequest.ReminderBot
             var statusUrl = pullRequestInfo.ResourceContainers.Account.BaseUrl +
                 $"{pr.Repository.Project.Id}/_apis/git/repositories/{pr.Repository.Id}" +
                 $"/pullRequests/{pr.PullRequestId}/statuses?api-version=4.0-preview";
+            var latestIteration = await GetLatestPullRequestIterationAsync(pullRequestInfo, accessToken);
             var description = $"Waiting for {pr.Reviewers.Count(r => r.Vote == 0)} reviewers";
             var state = PullRequestState.Pending;
             if (reviewed)
@@ -105,7 +106,8 @@ namespace VSTS.PullRequest.ReminderBot
                     Genre = "vsts-pullrequest-bot"
                 },
                 TargetUrl = pr.Links.Web.Href,
-                Description = description
+                Description = description,
+                IterationId = latestIteration
             };
             using (var httpClient = new HttpClient())
             {
@@ -116,6 +118,25 @@ namespace VSTS.PullRequest.ReminderBot
                 resp.EnsureSuccessStatusCode();
             }
             log.Info($"{string.Join("\n", outstandingReviewers)}\n");
+        }
+
+        private static async Task<long> GetLatestPullRequestIterationAsync(SubscriptionEvent<PullRequestEvent> pullRequestInfo, string accessToken)
+        {
+            var url = $"{pullRequestInfo.ResourceContainers.Account.BaseUrl}" +
+                $"/_apis/git/repositories/{pullRequestInfo.Resource.Repository.Id}" +
+                $"/pullRequests/{pullRequestInfo.Resource.PullRequestId}/iterations?api-version=4.1-preview";
+            using (var httpClient = new HttpClient())
+            {
+                httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                var resp = await httpClient.GetStringAsync(url);
+                var data = JsonConvert.DeserializeObject<PullRequestIterations>(resp);
+                return data
+                    .Value
+                    .Select(v => v.Id)
+                    .OrderByDescending(v => v)
+                    .FirstOrDefault();
+            }
         }
     }
 }

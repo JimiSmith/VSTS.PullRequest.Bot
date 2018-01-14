@@ -16,6 +16,9 @@
         [JsonProperty("state")]
         public PullRequestState State { get; set; }
 
+        [JsonProperty("iterationId")]
+        public long IterationId { get; set; }
+
         [JsonProperty("description")]
         public string Description { get; set; }
 
