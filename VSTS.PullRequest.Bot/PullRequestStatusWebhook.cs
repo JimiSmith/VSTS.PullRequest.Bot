@@ -42,7 +42,7 @@ namespace VSTS.PullRequest.ReminderBot
         public static async Task<HttpResponseMessage> PullRequestUpdated(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "pullRequestUpdated")]HttpRequestMessage req,
             [Table("Projects")] CloudTable projects,
-            [Queue("update-pr-status")] IAsyncCollector<string> updateStatusCollector)
+            [Queue("update-pr-status")] IAsyncCollector<SubscriptionEvent<PullRequestEvent>> updateStatusCollector)
         {
             var pullRequestInfo = JsonConvert.DeserializeObject<SubscriptionEvent<PullRequestEvent>>(await req.Content.ReadAsStringAsync().ConfigureAwait(false));
             if (pullRequestInfo.Resource == null || pullRequestInfo.Resource.Status != "active")
@@ -57,7 +57,7 @@ namespace VSTS.PullRequest.ReminderBot
                 .FirstOrDefault();
             if (project != null)
             {
-                await updateStatusCollector.AddAsync(JsonConvert.SerializeObject(pullRequestInfo));
+                await updateStatusCollector.AddAsync(pullRequestInfo);
             }
             return req.CreateResponse(HttpStatusCode.OK);
         }
