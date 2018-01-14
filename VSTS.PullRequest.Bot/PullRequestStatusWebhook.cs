@@ -18,7 +18,7 @@ namespace VSTS.PullRequest.ReminderBot
         public static async Task<HttpResponseMessage> PullRequestCreated(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "pullRequestCreated")]HttpRequestMessage req,
             [Table("Projects")] CloudTable projects,
-            TraceWriter log)
+            [Queue("update-pr-status")] IAsyncCollector<SubscriptionEvent<PullRequestEvent>> updateStatusCollector)
         {
             var pullRequestInfo = JsonConvert.DeserializeObject<SubscriptionEvent<PullRequestEvent>>(await req.Content.ReadAsStringAsync().ConfigureAwait(false));
             if (pullRequestInfo.Resource == null || pullRequestInfo.Resource.Status != "active")
@@ -33,8 +33,7 @@ namespace VSTS.PullRequest.ReminderBot
                 .FirstOrDefault();
             if (project != null)
             {
-                await Helpers.UpdateAccessToken(projects, project.PartitionKey, project.RowKey).ConfigureAwait(false);
-                await UpdateStatusAsync(log, pullRequestInfo, project.AccessToken).ConfigureAwait(false);
+                await updateStatusCollector.AddAsync(pullRequestInfo);
             }
             return req.CreateResponse(HttpStatusCode.OK);
         }
@@ -43,7 +42,7 @@ namespace VSTS.PullRequest.ReminderBot
         public static async Task<HttpResponseMessage> PullRequestUpdated(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "pullRequestUpdated")]HttpRequestMessage req,
             [Table("Projects")] CloudTable projects,
-            TraceWriter log)
+            [Queue("update-pr-status")] IAsyncCollector<string> updateStatusCollector)
         {
             var pullRequestInfo = JsonConvert.DeserializeObject<SubscriptionEvent<PullRequestEvent>>(await req.Content.ReadAsStringAsync().ConfigureAwait(false));
             if (pullRequestInfo.Resource == null || pullRequestInfo.Resource.Status != "active")
@@ -58,14 +57,24 @@ namespace VSTS.PullRequest.ReminderBot
                 .FirstOrDefault();
             if (project != null)
             {
-                await Helpers.UpdateAccessToken(projects, project.PartitionKey, project.RowKey).ConfigureAwait(false);
-                await UpdateStatusAsync(log, pullRequestInfo, project.AccessToken).ConfigureAwait(false);
+                await updateStatusCollector.AddAsync(JsonConvert.SerializeObject(pullRequestInfo));
             }
             return req.CreateResponse(HttpStatusCode.OK);
         }
 
-        private static async Task UpdateStatusAsync(TraceWriter log, SubscriptionEvent<PullRequestEvent> pullRequestInfo, string accessToken)
+        [FunctionName(nameof(UpdateStatusAsync))]
+        public static async Task UpdateStatusAsync(
+            [QueueTrigger("update-pr-status")] SubscriptionEvent<PullRequestEvent> pullRequestInfo,
+            [Table("Projects")] CloudTable projects)
         {
+            var partitionKey = new Uri(pullRequestInfo.ResourceContainers.Account.BaseUrl).Authority;
+            var rowKey = pullRequestInfo.ResourceContainers.Project.Id;
+            var project = projects.CreateQuery<ProjectEntity>()
+                .Where(p => p.PartitionKey == partitionKey && p.RowKey == rowKey)
+                .ToList()
+                .First();
+            await Helpers.UpdateAccessToken(projects, project.PartitionKey, project.RowKey).ConfigureAwait(false);
+            var accessToken = project.AccessToken;
             var pr = pullRequestInfo.Resource;
             if (pr.Reviewers.Count == 0)
             {
@@ -114,10 +123,8 @@ namespace VSTS.PullRequest.ReminderBot
                 httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
                 var resp = await httpClient.PostAsJsonAsync(statusUrl, update).ConfigureAwait(false);
-                var details = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
                 resp.EnsureSuccessStatusCode();
             }
-            log.Info($"{string.Join("\n", outstandingReviewers)}\n");
         }
 
         private static async Task<long> GetLatestPullRequestIterationAsync(SubscriptionEvent<PullRequestEvent> pullRequestInfo, string accessToken)
