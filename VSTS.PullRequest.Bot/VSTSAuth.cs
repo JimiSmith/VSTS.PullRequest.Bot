@@ -49,7 +49,7 @@ namespace VSTS.PullRequest.Bot
 
         [FunctionName(nameof(Callback))]
         public static async Task<HttpResponseMessage> Callback(
-            [HttpTrigger(AuthorizationLevel.Function, "get", Route = "vsts/callback")]HttpRequestMessage req,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = "vsts/callback")]HttpRequestMessage req,
             [Table("Projects")] CloudTable projects,
             [Queue("projects-events-check")] IAsyncCollector<ProjectEntity> projectCollector)
         {

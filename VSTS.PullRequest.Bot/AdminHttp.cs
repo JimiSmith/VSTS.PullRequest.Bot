@@ -104,9 +104,16 @@ namespace VSTS.PullRequest.ReminderBot
             await projects.ExecuteAsync(TableOperation.InsertOrMerge(project));
             await projectCollector.AddAsync(project);
             var response = req.CreateResponse(HttpStatusCode.Redirect);
-            response.Headers.Location = new Uri($"{Helpers.GetEnvironmentVariable("Host")}/api/vsts/auth" +
+            var redirectUrl = $"{Helpers.GetEnvironmentVariable("Host")}/api/vsts/auth" +
                 $"?instance={Uri.EscapeDataString(instance)}" +
-                $"&projectId={Uri.EscapeDataString(projectIdString)}");
+                $"&projectId={Uri.EscapeDataString(projectIdString)}";
+
+            var functionKey = Helpers.GetEnvironmentVariable("FunctionKey.AuthStart");
+            if (!string.IsNullOrWhiteSpace(functionKey))
+            {
+                redirectUrl += $"&code={functionKey}";
+            }
+            response.Headers.Location = new Uri(redirectUrl);
             return response;
         }
 
