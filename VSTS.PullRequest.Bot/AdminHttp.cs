@@ -81,7 +81,8 @@ namespace VSTS.PullRequest.ReminderBot
     {
         [FunctionName(nameof(AddProject))]
         public static async Task<HttpResponseMessage> AddProject([HttpTrigger(AuthorizationLevel.Function, "post", Route = "addProject")]HttpRequestMessage req,
-            [Table("Projects")] CloudTable projects)
+            [Table("Projects")] CloudTable projects,
+            [Queue("projects-events-check")] IAsyncCollector<ProjectEntity> projectCollector)
         {
             var data = JsonConvert.DeserializeObject<dynamic>(await req.Content.ReadAsStringAsync());
             if (!Guid.TryParse((string)data.projectId, out Guid projectId))
@@ -95,16 +96,34 @@ namespace VSTS.PullRequest.ReminderBot
                 .FirstOrDefault() ?? new ProjectEntity
                 {
                     PartitionKey = instance,
-                    RowKey = projectId.ToString(),
+                    RowKey = projectIdString,
                     SubscribedToEvents = false,
-                    Pat = (string)data.pat
+                    AuthState = Guid.NewGuid().ToString()
                 };
-            if (!project.SubscribedToEvents)
+
+            await projects.ExecuteAsync(TableOperation.InsertOrMerge(project));
+            await projectCollector.AddAsync(project);
+            var response = req.CreateResponse(HttpStatusCode.Redirect);
+            response.Headers.Location = new Uri($"{Helpers.GetEnvironmentVariable("Host")}/api/vsts/auth" +
+                $"?instance={Uri.EscapeDataString(instance)}" +
+                $"&projectId={Uri.EscapeDataString(projectIdString)}");
+            return response;
+        }
+
+        [FunctionName(nameof(EnsureProjectIsSubscribedToEvents))]
+        public static async Task EnsureProjectIsSubscribedToEvents([QueueTrigger("projects-events-check")] ProjectEntity queuedProject,
+            [Table("Projects")] CloudTable projects)
+        {
+            var project = projects
+                .CreateQuery<ProjectEntity>()
+                .Where(p => p.PartitionKey == queuedProject.PartitionKey && p.RowKey == queuedProject.RowKey)
+                .ToList()
+                .FirstOrDefault();
+            if (!project.SubscribedToEvents && !string.IsNullOrWhiteSpace(project.AccessToken))
             {
                 project.SubscribedToEvents = await SubscribeToProjectEventsAsync(project);
+                await projects.ExecuteAsync(TableOperation.InsertOrMerge(project));
             }
-            await projects.ExecuteAsync(TableOperation.InsertOrMerge(project));
-            return req.CreateResponse(HttpStatusCode.OK);
         }
 
         private static async Task<bool> SubscribeToProjectEventsAsync(ProjectEntity projectEntity)
@@ -112,9 +131,7 @@ namespace VSTS.PullRequest.ReminderBot
             using (var httpClient = new HttpClient())
             {
                 httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(
-                        Encoding.ASCII.GetBytes(
-                        string.Format("{0}:{1}", "", projectEntity.Pat))));
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", projectEntity.AccessToken);
                 var url = projectEntity.GetCreateSubscriptionUri();
                 var createBody = projectEntity.GetCreatePullRequestCreatedSubscriptionBody();
                 var createPRSuccessful = false;
@@ -151,9 +168,7 @@ namespace VSTS.PullRequest.ReminderBot
             using (var httpClient = new HttpClient())
             {
                 httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(
-                        Encoding.ASCII.GetBytes(
-                        string.Format("{0}:{1}", "", projectEntity.Pat))));
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", projectEntity.AccessToken);
                 var url = $"https://{projectEntity.PartitionKey}/_apis/hooks/subscriptionsquery?api-version=4.1-preview";
                 var query = new CreateSubscriptionQuery(subscription);
                 var resp = await httpClient.PostAsJsonAsync(url, query);

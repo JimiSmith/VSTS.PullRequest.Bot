@@ -1,13 +1,13 @@
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Host;
+using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
 using System;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace VSTS.PullRequest.ReminderBot
@@ -17,21 +17,24 @@ namespace VSTS.PullRequest.ReminderBot
         [FunctionName(nameof(PullRequestCreated))]
         public static async Task<HttpResponseMessage> PullRequestCreated(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "pullRequestCreated")]HttpRequestMessage req,
-            [Table("Projects")] IQueryable<ProjectEntity> projects,
+            [Table("Projects")] CloudTable projects,
             TraceWriter log)
         {
-            var pullRequestInfo = JsonConvert.DeserializeObject<SubscriptionEvent<PullRequestEvent>>(await req.Content.ReadAsStringAsync());
+            var pullRequestInfo = JsonConvert.DeserializeObject<SubscriptionEvent<PullRequestEvent>>(await req.Content.ReadAsStringAsync().ConfigureAwait(false));
             if (pullRequestInfo.Resource == null || pullRequestInfo.Resource.Status != "active")
             {
                 return req.CreateResponse(HttpStatusCode.OK);
             }
             var instance = new Uri(pullRequestInfo.ResourceContainers.Account.BaseUrl).Authority;
-            var project = projects.Where(p => p.PartitionKey == instance && p.RowKey == pullRequestInfo.ResourceContainers.Project.Id)
+            var project = projects
+                .CreateQuery<ProjectEntity>()
+                .Where(p => p.PartitionKey == instance && p.RowKey == pullRequestInfo.ResourceContainers.Project.Id)
                 .ToList()
                 .FirstOrDefault();
             if (project != null)
             {
-                await UpdateStatusAsync(log, pullRequestInfo, project.Pat);
+                await Helpers.UpdateAccessToken(projects, project.PartitionKey, project.RowKey).ConfigureAwait(false);
+                await UpdateStatusAsync(log, pullRequestInfo, project.AccessToken).ConfigureAwait(false);
             }
             return req.CreateResponse(HttpStatusCode.OK);
         }
@@ -39,26 +42,29 @@ namespace VSTS.PullRequest.ReminderBot
         [FunctionName(nameof(PullRequestUpdated))]
         public static async Task<HttpResponseMessage> PullRequestUpdated(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "pullRequestUpdated")]HttpRequestMessage req,
-            [Table("Projects")] IQueryable<ProjectEntity> projects,
+            [Table("Projects")] CloudTable projects,
             TraceWriter log)
         {
-            var pullRequestInfo = JsonConvert.DeserializeObject<SubscriptionEvent<PullRequestEvent>>(await req.Content.ReadAsStringAsync());
+            var pullRequestInfo = JsonConvert.DeserializeObject<SubscriptionEvent<PullRequestEvent>>(await req.Content.ReadAsStringAsync().ConfigureAwait(false));
             if (pullRequestInfo.Resource == null || pullRequestInfo.Resource.Status != "active")
             {
                 return req.CreateResponse(HttpStatusCode.OK);
             }
             var instance = new Uri(pullRequestInfo.ResourceContainers.Account.BaseUrl).Authority;
-            var project = projects.Where(p => p.PartitionKey == instance && p.RowKey == pullRequestInfo.ResourceContainers.Project.Id)
+            var project = projects
+                .CreateQuery<ProjectEntity>()
+                .Where(p => p.PartitionKey == instance && p.RowKey == pullRequestInfo.ResourceContainers.Project.Id)
                 .ToList()
                 .FirstOrDefault();
             if (project != null)
             {
-                await UpdateStatusAsync(log, pullRequestInfo, project.Pat);
+                await Helpers.UpdateAccessToken(projects, project.PartitionKey, project.RowKey).ConfigureAwait(false);
+                await UpdateStatusAsync(log, pullRequestInfo, project.AccessToken).ConfigureAwait(false);
             }
             return req.CreateResponse(HttpStatusCode.OK);
         }
 
-        private static async Task UpdateStatusAsync(TraceWriter log, SubscriptionEvent<PullRequestEvent> pullRequestInfo, string pat)
+        private static async Task UpdateStatusAsync(TraceWriter log, SubscriptionEvent<PullRequestEvent> pullRequestInfo, string accessToken)
         {
             var pr = pullRequestInfo.Resource;
             if (pr.Reviewers.Count == 0)
@@ -104,11 +110,9 @@ namespace VSTS.PullRequest.ReminderBot
             using (var httpClient = new HttpClient())
             {
                 httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", Convert.ToBase64String(
-                        Encoding.ASCII.GetBytes(
-                        string.Format("{0}:{1}", "", pat))));
-                var resp = await httpClient.PostAsJsonAsync(statusUrl, update);
-                var details = await resp.Content.ReadAsStringAsync();
+                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                var resp = await httpClient.PostAsJsonAsync(statusUrl, update).ConfigureAwait(false);
+                var details = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
                 resp.EnsureSuccessStatusCode();
             }
             log.Info($"{string.Join("\n", outstandingReviewers)}\n");
