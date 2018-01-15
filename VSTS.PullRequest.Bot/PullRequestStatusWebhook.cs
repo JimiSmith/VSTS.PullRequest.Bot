@@ -81,9 +81,6 @@ namespace VSTS.PullRequest.ReminderBot
                 // don't set a status if there are no reviewers
                 return;
             }
-            var outstandingReviewers = pr.Reviewers
-                .Where(r => r.UniqueName.Contains("@") && r.Vote == 0)
-                .Select(r => r.UniqueName);
             var percentReviewed = (pr.Reviewers.Count(r => r.Vote != 0) / (float)pr.Reviewers.Count) * 100.0f;
             var vote = pr.Reviewers.Sum(r => r.Vote);
             var reviewed = percentReviewed >= 100;
