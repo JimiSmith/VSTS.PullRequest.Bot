@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using VSTS.PullRequest.ReminderBot;
 
@@ -67,7 +68,7 @@ namespace VSTS.PullRequest.Bot
                 .FirstOrDefault();
             if (project == null)
             {
-                return req.CreateResponse(HttpStatusCode.BadRequest);
+                return CreateHtmlResponse(req, HttpStatusCode.BadRequest, "<html><head><title>Fail</title></head><body><h3>Unknown project</h3></body></html>");
             }
             var content = new FormUrlEncodedContent(new List<KeyValuePair<string, string>>
             {
@@ -81,16 +82,28 @@ namespace VSTS.PullRequest.Bot
             {
                 var response = await httpClient.PostAsync("https://app.vssps.visualstudio.com/oauth2/token", content);
                 var tokenJson = await response.Content.ReadAsStringAsync();
+                if (!response.IsSuccessStatusCode)
+                {
+                    return CreateHtmlResponse(req, HttpStatusCode.BadRequest, $"<html><head><title>Fail</title></head><body>{response}</body></html>");
+                }
                 var tokenData = JsonConvert.DeserializeObject<dynamic>(tokenJson);
 
                 project.AccessToken = (string)tokenData.access_token;
                 project.RefreshToken = (string)tokenData.refresh_token;
                 project.ExpiresAt = DateTimeOffset.UtcNow.AddSeconds((long)tokenData.expires_in);
             }
-            await projectCollector.AddAsync(project);
             await projects.ExecuteAsync(TableOperation.InsertOrMerge(project));
+            await projectCollector.AddAsync(project);
 
-            return req.CreateResponse(HttpStatusCode.OK);
+            return CreateHtmlResponse(req, HttpStatusCode.OK, "<html><head><title>Success</title></head><body><h3>Success</h3></body></html>");
+        }
+
+        private static HttpResponseMessage CreateHtmlResponse(HttpRequestMessage req, HttpStatusCode statusCode, string html)
+        {
+            var resp = req.CreateResponse(statusCode);
+            resp.Content = new StringContent(html);
+            resp.Content.Headers.ContentType = new MediaTypeHeaderValue("text/html");
+            return resp;
         }
     }
 }
