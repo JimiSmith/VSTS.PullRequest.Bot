@@ -11,6 +11,7 @@ using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using VSTS.PullRequest.Bot.Models;
 using VSTS.PullRequest.Bot.Models.VSTS;
+using VSTS.PullRequest.Bot.RulesEngine;
 
 namespace VSTS.PullRequest.ReminderBot
 {
@@ -129,49 +130,51 @@ namespace VSTS.PullRequest.ReminderBot
             var rules = rulesTable.CreateQuery<RuleEntity>()
                 .Where(r => r.PartitionKey == rowKey)
                 .ToList()
-                .GroupBy(r => r.RuleType);
+                .Select(r => RulesContainer.FromJson(r.RuleJson))
+                .SelectMany(RuleParser.ParseRules);
 
             foreach (var ruleGroup in rules)
             {
-                switch (ruleGroup.Key)
+                switch (ruleGroup.Type)
                 {
-                    case RuleType.WorkItemTaskUpdate:
-                        var ruleUpdates = ruleGroup
-                            .Select(rg => new WorkItemUpdate
-                            {
-                                Op = "add",
-                                Path = rg.Key,
-                                Value = rg.Value
-                            });
+                    case RuleType.WorkItemUpdate:
+                        var allFields = ruleGroup
+                            .Rules
+                            .SelectMany(r => r.AllKeys)
+                            .Distinct();
                         foreach (var workItem in (await GetPullRequestWorkItemsAsync(
                             accessToken,
                             pullRequestInfo,
-                            ruleUpdates.Select(ru => ru.Path).ToList()))
-                            .Where(wi => wi.Fields["System.WorkItemType"] == "Task"))
+                            allFields.ToList())))
                         {
-                            ruleUpdates = ruleUpdates
-                                .Where(ru => workItem.Fields[ru.Path] != ru.Value)
-                                .Select(ru => new WorkItemUpdate
+                            foreach (var rule in ruleGroup.Rules)
+                            {
+                                if (!rule.Matches(workItem.Fields))
                                 {
-                                    Op = ru.Op,
-                                    Path = $"/fields/{ru.Path}",
-                                    Value = ru.Value
-                                });
-                            if (!ruleUpdates.Any())
-                            {
-                                return;
-                            }
-                            var url = pullRequestInfo.ResourceContainers.Account.BaseUrl +
-                                $"_apis/wit/workitems/{workItem.Id}?api-version=4.1-preview";
-                            using (var httpClient = new HttpClient())
-                            {
-                                httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-                                httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-                                var req = new HttpRequestMessage(new HttpMethod("PATCH"), url);
-                                req.Content = new StringContent(JsonConvert.SerializeObject(ruleUpdates));
-                                req.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json-patch+json");
-                                var resp = await httpClient.SendAsync(req).ConfigureAwait(false);
-                                var json = await resp.Content.ReadAsStringAsync();
+                                    continue;
+                                }
+                                var ruleUpdates = rule.UpdatedFields
+                                    .Select(uf => new WorkItemUpdate
+                                    {
+                                        Op = "add",
+                                        Path = $"/fields/{uf.Key}",
+                                        Value = uf.Value
+                                    });
+                                if (!ruleUpdates.Any())
+                                {
+                                    continue;
+                                }
+                                var url = pullRequestInfo.ResourceContainers.Account.BaseUrl +
+                                    $"_apis/wit/workitems/{workItem.Id}?api-version=4.1-preview";
+                                using (var httpClient = new HttpClient())
+                                {
+                                    httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                                    httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+                                    var req = new HttpRequestMessage(new HttpMethod("PATCH"), url);
+                                    req.Content = new StringContent(JsonConvert.SerializeObject(ruleUpdates));
+                                    req.Content.Headers.ContentType = new MediaTypeHeaderValue("application/json-patch+json");
+                                    await httpClient.SendAsync(req).ConfigureAwait(false);
+                                }
                             }
                         }
                         break;
@@ -204,11 +207,11 @@ namespace VSTS.PullRequest.ReminderBot
                     $"?ids={Uri.EscapeDataString(string.Join(",", workItemIds))}" +
                     $"&fields={Uri.EscapeDataString(string.Join(",", fieldsRequired))}";
                 resp = await httpClient.GetAsync(detailUrl).ConfigureAwait(false);
-                json = await resp.Content.ReadAsStringAsync();
                 if (!resp.IsSuccessStatusCode)
                 {
                     return new List<AssociatedWorkItem>();
                 }
+                json = await resp.Content.ReadAsStringAsync();
                 return JsonConvert.DeserializeObject<Response<AssociatedWorkItem>>(json).Value;
             }
         }

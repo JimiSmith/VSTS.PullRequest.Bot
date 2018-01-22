@@ -260,3 +260,4 @@ paket-files/
 __pycache__/
 *.pyc
 *.pubxml
+/VSTS.PullRequest.Bot/schemas/test-rule.json

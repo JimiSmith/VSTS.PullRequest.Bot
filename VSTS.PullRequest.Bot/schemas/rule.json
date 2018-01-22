@@ -1,0 +1,113 @@
+{
+  "$id": "https://github.com/JimiSmith/VSTS.PullRequest.Bot/schemas/rule.json",
+  "type": "object",
+  "definitions": {},
+  "$schema": "http://json-schema.org/draft-06/schema#",
+  "properties": {
+    "rules": {
+      "$id": "/properties/rules",
+      "type": "array",
+      "items": {
+        "$id": "/properties/rules/items",
+        "type": "object",
+        "properties": {
+          "type": {
+            "$id": "/properties/conditions/items/properties/type",
+            "type": "string",
+            "title": "Rule Type",
+            "default": "",
+            "examples": [
+              "WorkItemUpdate"
+            ],
+            "enum": [
+              "WorkItemUpdate"
+            ]
+          },
+          "conditions": {
+            "$id": "/properties/conditions",
+            "type": "array",
+            "items": {
+              "$id": "/properties/conditions/items",
+              "type": "object",
+              "properties": {
+                "key": {
+                  "$id": "/properties/conditions/items/properties/key",
+                  "type": "string",
+                  "title": "The key that should be matched",
+                  "description": "This varies based on the type but is the key that will be checked against the VSTS API",
+                  "default": "",
+                  "examples": [
+                    "System.State"
+                  ]
+                },
+                "value": {
+                  "$id": "/properties/conditions/items/properties/value",
+                  "type": "string",
+                  "title": "The value that should be matched",
+                  "description": "This varies based on the type but is the value that will be checked against the VSTS API",
+                  "default": "",
+                  "examples": [
+                    "In Review"
+                  ]
+                },
+                "operator": {
+                  "$id": "/properties/conditions/items/properties/operator",
+                  "type": "string",
+                  "title": "Operator Type",
+                  "description": "Indicates how the value should be evaluated against the response from VSTS",
+                  "default": "",
+                  "examples": [
+                    "ne"
+                  ],
+                  "enum": [
+                    "eq",
+                    "ne"
+                  ]
+                }
+              },
+              "required": [
+                "operator",
+                "value",
+                "key"
+              ]
+            }
+          },
+          "actions": {
+            "$id": "/properties/actions",
+            "type": "array",
+            "items": {
+              "$id": "/properties/actions/items",
+              "type": "object",
+              "properties": {
+                "key": {
+                  "$id": "/properties/actions/items/properties/key",
+                  "type": "string",
+                  "title": "The key(field) that should be updated",
+                  "description": "Must match what VSTS accepts",
+                  "default": "",
+                  "examples": [
+                    "System.State"
+                  ]
+                },
+                "value": {
+                  "$id": "/properties/actions/items/properties/value",
+                  "type": "string",
+                  "title": "The value to set the key to",
+                  "description": "Must be accepted by VSTS",
+                  "default": "",
+                  "examples": [
+                    "In Review"
+                  ]
+                }
+              },
+              "required": [
+                "value",
+                "key"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}
