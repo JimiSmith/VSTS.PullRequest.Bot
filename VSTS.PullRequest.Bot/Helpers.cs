@@ -1,12 +1,13 @@
 ﻿using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
 using System;
-using System.Linq;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
+using VSTS.PullRequest.Bot.Models;
 
-namespace VSTS.PullRequest.ReminderBot
+namespace VSTS.PullRequest.Bot
 {
     public static class Helpers
     {

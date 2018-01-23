@@ -1,7 +1,7 @@
 ﻿using Microsoft.WindowsAzure.Storage.Table;
 using System;
 
-namespace VSTS.PullRequest.ReminderBot
+namespace VSTS.PullRequest.Bot.Models
 {
     // PartitionKey is instance
     // RowKey is project id

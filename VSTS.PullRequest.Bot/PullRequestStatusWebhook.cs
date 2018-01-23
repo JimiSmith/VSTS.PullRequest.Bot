@@ -10,10 +10,11 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using VSTS.PullRequest.Bot.Models;
-using VSTS.PullRequest.Bot.Models.VSTS;
+using VSTS.PullRequest.Bot.Models.VSTS.Request;
+using VSTS.PullRequest.Bot.Models.VSTS.Response;
 using VSTS.PullRequest.Bot.RulesEngine;
 
-namespace VSTS.PullRequest.ReminderBot
+namespace VSTS.PullRequest.Bot
 {
     public static class PullRequestStatusWebhook
     {
@@ -226,7 +227,7 @@ namespace VSTS.PullRequest.ReminderBot
                 httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
                 httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
                 var resp = await httpClient.GetStringAsync(url);
-                var data = JsonConvert.DeserializeObject<PullRequestIterations>(resp);
+                var data = JsonConvert.DeserializeObject<Response<PullRequestIteration>>(resp);
                 return data
                     .Value
                     .Select(v => v.Id)

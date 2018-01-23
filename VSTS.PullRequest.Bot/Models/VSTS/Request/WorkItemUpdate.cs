@@ -1,4 +1,4 @@
-﻿namespace VSTS.PullRequest.ReminderBot
+﻿namespace VSTS.PullRequest.Bot.Models.VSTS.Request
 {
     using Newtonsoft.Json;
 

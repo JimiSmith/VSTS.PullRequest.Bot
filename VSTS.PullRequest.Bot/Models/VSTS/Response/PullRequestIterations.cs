@@ -1,19 +1,9 @@
-﻿namespace VSTS.PullRequest.ReminderBot
+﻿namespace VSTS.PullRequest.Bot.Models.VSTS.Response
 {
     using Newtonsoft.Json;
     using System;
-    using System.Collections.Generic;
 
-    public class PullRequestIterations
-    {
-        [JsonProperty("value")]
-        public List<Value> Value { get; set; }
-
-        [JsonProperty("count")]
-        public long Count { get; set; }
-    }
-
-    public class Value
+    public class PullRequestIteration
     {
         [JsonProperty("id")]
         public long Id { get; set; }

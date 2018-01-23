@@ -8,10 +8,11 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Text;
 using System.Threading.Tasks;
+using VSTS.PullRequest.Bot.Models;
+using VSTS.PullRequest.Bot.Models.VSTS.Request;
 
-namespace VSTS.PullRequest.ReminderBot
+namespace VSTS.PullRequest.Bot
 {
     public static class ProjectEntityExtensions
     {

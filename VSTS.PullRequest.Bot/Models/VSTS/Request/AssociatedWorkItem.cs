@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System.Collections.Generic;
 
-namespace VSTS.PullRequest.Bot.Models.VSTS
+namespace VSTS.PullRequest.Bot.Models.VSTS.Request
 {
     public class AssociatedWorkItem
     {
