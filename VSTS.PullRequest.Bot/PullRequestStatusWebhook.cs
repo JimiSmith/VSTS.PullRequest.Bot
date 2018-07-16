@@ -89,7 +89,7 @@ namespace VSTS.PullRequest.ReminderBot
             var reviewed = percentReviewed >= 100;
             var statusUrl = pullRequestInfo.ResourceContainers.Account.BaseUrl +
                 $"{pr.Repository.Project.Id}/_apis/git/repositories/{pr.Repository.Id}" +
-                $"/pullRequests/{pr.PullRequestId}/statuses?api-version=4.0-preview";
+                $"/pullRequests/{pr.PullRequestId}/statuses?api-version=4.1-preview";
             var latestIteration = await GetLatestPullRequestIterationAsync(pullRequestInfo, accessToken);
             var description = $"Waiting for {pr.Reviewers.Count(r => r.Vote == 0)} reviewers";
             var state = PullRequestState.Pending;
@@ -162,7 +162,7 @@ namespace VSTS.PullRequest.ReminderBot
                                 return;
                             }
                             var url = pullRequestInfo.ResourceContainers.Account.BaseUrl +
-                                $"_apis/wit/workitems/{workItem.Id}?api-version=4.1-preview";
+                                $"_apis/wit/workitems/{workItem.Id}?api-version=4.1";
                             using (var httpClient = new HttpClient())
                             {
                                 httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -187,7 +187,7 @@ namespace VSTS.PullRequest.ReminderBot
             fieldsRequired.Add("System.WorkItemType");
             var url = pullRequestInfo.ResourceContainers.Account.BaseUrl +
                 $"_apis/git/repositories/{pullRequestInfo.Resource.Repository.Id}" +
-                $"/pullRequests/{pullRequestInfo.Resource.PullRequestId}/workitems?api-version=4.1-preview";
+                $"/pullRequests/{pullRequestInfo.Resource.PullRequestId}/workitems?api-version=4.1";
             using (var httpClient = new HttpClient())
             {
                 httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -217,7 +217,7 @@ namespace VSTS.PullRequest.ReminderBot
         {
             var url = $"{pullRequestInfo.ResourceContainers.Account.BaseUrl}" +
                 $"/_apis/git/repositories/{pullRequestInfo.Resource.Repository.Id}" +
-                $"/pullRequests/{pullRequestInfo.Resource.PullRequestId}/iterations?api-version=4.1-preview";
+                $"/pullRequests/{pullRequestInfo.Resource.PullRequestId}/iterations?api-version=4.1";
             using (var httpClient = new HttpClient())
             {
                 httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
