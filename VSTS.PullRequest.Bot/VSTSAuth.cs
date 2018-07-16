@@ -41,7 +41,7 @@ namespace VSTS.PullRequest.Bot
                 $"?client_id={Uri.EscapeDataString(Helpers.GetEnvironmentVariable("VSTS.AppId"))}" +
                 $"&response_type=Assertion" +
                 $"&state={project.AuthState}" +
-                $"&scope={Uri.EscapeDataString("vso.code vso.code_status vso.notification_manage vso.work_full vso.workitemsearch")}" +
+                $"&scope={Uri.EscapeDataString("vso.code vso.code_status vso.notification_manage vso.work_full")}" +
                 $"&redirect_uri={Uri.EscapeDataString(callbackUrl)}";
             var resp = req.CreateResponse(HttpStatusCode.Redirect);
             resp.Headers.Location = new Uri(redirectUrl);
