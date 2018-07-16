@@ -5,6 +5,7 @@ using System.Linq;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Microsoft.CSharp.RuntimeBinder;
 
 namespace VSTS.PullRequest.ReminderBot
 {
@@ -37,13 +38,20 @@ namespace VSTS.PullRequest.ReminderBot
             {
                 var response = await httpClient.PostAsync("https://app.vssps.visualstudio.com/oauth2/token", content);
                 var tokenJson = await response.Content.ReadAsStringAsync();
-                var tokenData = JsonConvert.DeserializeObject<dynamic>(tokenJson);
+                try
+                {
+                    var tokenData = JsonConvert.DeserializeObject<dynamic>(tokenJson);
 
-                project.AccessToken = (string)tokenData.access_token;
-                project.RefreshToken = (string)tokenData.refresh_token;
-                project.ExpiresAt = DateTimeOffset.UtcNow.AddSeconds((long)tokenData.expires_in);
+                    project.AccessToken = (string)tokenData.access_token;
+                    project.RefreshToken = (string)tokenData.refresh_token;
+                    project.ExpiresAt = DateTimeOffset.UtcNow.AddSeconds(Int64.Parse(tokenData.expires_in.ToString()));
 
-                await projects.ExecuteAsync(TableOperation.InsertOrMerge(project));
+                    await projects.ExecuteAsync(TableOperation.InsertOrMerge(project));
+                }
+                catch (RuntimeBinderException)
+                {
+                    throw new TokenUpdateException(tokenJson);
+                }
             }
         }
     }
